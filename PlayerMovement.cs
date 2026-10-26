@@ -23,6 +23,23 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float deceleration = 25.0f;
 
 
+    [Header("ダッシュ（加速）設定")]
+
+    [Tooltip("ダッシュのキーバインド。デフォルトはLeft Shift")]
+    [SerializeField] private Key dashKey = Key.LeftShift;
+
+    [Tooltip("ダッシュ中の移動速度")]
+    [Min(0f)]
+    [SerializeField] private float dashSpeed = 10.0f;
+
+    [Tooltip("ダッシュ開始時の加速（この値で一気に加速する）")]
+    [Min(0f)]
+    [SerializeField] private float dashAcceleration = 40.0f;
+
+    [Tooltip("按住（長押し）方式ではなく、1回押すごとにON/OFFを切り替える")]
+    [SerializeField] private bool toggleDashMode = false;
+
+
     [Header("カメラ設定")]
 
     [Tooltip("移動方向の基準にするカメラ")]
@@ -32,6 +49,8 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody rb;
 
     private Vector2 moveInput;
+
+    private bool isDashing = false;
 
 
     private void Awake()
@@ -46,12 +65,48 @@ public class PlayerMovement : MonoBehaviour
     private void Update()
     {
         ReadMovementInput();
+        ReadDashInput();
     }
 
 
     private void FixedUpdate()
     {
         Move();
+    }
+
+
+    /// <summary>
+    /// ダッシュ（加速）の入力を取得する。
+    /// </summary>
+    private void ReadDashInput()
+    {
+        if (Keyboard.current == null)
+        {
+            isDashing = false;
+            return;
+        }
+
+        KeyControl keyControl = Keyboard.current[dashKey];
+
+        if (keyControl == null)
+        {
+            isDashing = false;
+            return;
+        }
+
+        if (toggleDashMode)
+        {
+            // トグル方式：1回押すごとにON/OFF切り替え
+            if (keyControl.wasPressedThisFrame)
+            {
+                isDashing = !isDashing;
+            }
+        }
+        else
+        {
+            // 長押し方式：押している間だけダッシュ
+            isDashing = keyControl.isPressed;
+        }
     }
 
 
@@ -133,8 +188,21 @@ public class PlayerMovement : MonoBehaviour
 
         Vector3 currentVelocity = rb.linearVelocity;
 
+        // ダッシュ中は速度と加速率を切り替える
+        float speed = isDashing ? dashSpeed : moveSpeed;
+        float rate;
+
+        if (isDashing)
+        {
+            rate = dashAcceleration;
+        }
+        else
+        {
+            rate = acceleration;
+        }
+
         Vector3 targetVelocity =
-            moveDirection * moveSpeed;
+            moveDirection * speed;
 
         // Y方向の速度はジャンプスクリプトに任せる
         targetVelocity.y = currentVelocity.y;
@@ -153,14 +221,9 @@ public class PlayerMovement : MonoBehaviour
                 targetVelocity.z
             ).magnitude;
 
-        float rate;
-
-        if (targetSpeed > currentSpeed)
+        if (targetSpeed <= currentSpeed)
         {
-            rate = acceleration;
-        }
-        else
-        {
+            // 減速時はダッシュでも通常の減速率を使う
             rate = deceleration;
         }
 
@@ -174,5 +237,38 @@ public class PlayerMovement : MonoBehaviour
         newVelocity.y = currentVelocity.y;
 
         rb.linearVelocity = newVelocity;
+    }
+
+
+    /// <summary>
+    /// 現在の移動速度（Inspectorの値）を外部から取得する。
+    /// </summary>
+    public float MoveSpeed => moveSpeed;
+
+    /// <summary>
+    /// ダッシュ中かどうかを外部から取得する。
+    /// アニメーションやエフェクトの判定に使える。
+    /// </summary>
+    public bool IsDashing => isDashing;
+
+
+    /// <summary>
+    /// 他のスクリプト（UIボタン等）からダッシュ状態を
+    /// 強制的に切り替えるための公開メソッド。
+    /// </summary>
+    public void SetDashing(bool dashing)
+    {
+        isDashing = dashing;
+    }
+
+
+    /// <summary>
+    /// Sceneビューに移動方向の参考情報を表示する。
+    /// </summary>
+    private void OnDrawGizmosSelected()
+    {
+        // ダッシュ中のプレイヤーを黄色で表示
+        Gizmos.color = isDashing ? Color.yellow : Color.white;
+        Gizmos.DrawWireSphere(transform.position, 0.3f);
     }
 }
