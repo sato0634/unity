@@ -153,16 +153,8 @@ public class PlayerMovement : MonoBehaviour
                 targetVelocity.z
             ).magnitude;
 
-        float rate;
-
-        if (targetSpeed > currentSpeed)
-        {
-            rate = acceleration;
-        }
-        else
-        {
-            rate = deceleration;
-        }
+        // 減速時は加速度ではなく減速率を使う
+        float rate = targetSpeed <= currentSpeed ? deceleration : acceleration;
 
         Vector3 newVelocity = Vector3.MoveTowards(
             currentVelocity,
@@ -175,4 +167,16 @@ public class PlayerMovement : MonoBehaviour
 
         rb.linearVelocity = newVelocity;
     }
+
+
+    /// <summary>
+    /// 現在の移動速度（Inspectorの値）を外部から取得する。
+    /// </summary>
+    public float MoveSpeed => moveSpeed;
+
+    /// <summary>
+    /// 現在移動入力があるかどうかを外部から取得する。
+    /// PlayerDashなどが参照する。
+    /// </summary>
+    public bool IsMoving => moveInput.sqrMagnitude > 0.001f;
 }
